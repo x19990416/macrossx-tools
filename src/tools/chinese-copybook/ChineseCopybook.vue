@@ -28,6 +28,7 @@ const gridType = ref<GridType>('field')
 const gridColor = ref<InkColor>('indigo')
 const inkColor = ref<InkColor>('black')
 const traceOpacity = ref(0.22)
+const fillRemainingTrace = ref(false)
 const pageTitle = ref('姓名：__________  日期：__________')
 const gradeOpen = ref(true)
 const strokeOpen = ref(false)
@@ -86,6 +87,7 @@ function resetSettings() {
   gridColor.value = 'indigo'
   inkColor.value = 'black'
   traceOpacity.value = 0.22
+  fillRemainingTrace.value = false
   pageTitle.value = '姓名：__________  日期：__________'
   statusMessage.value = '已恢复默认设置。'
 }
@@ -293,6 +295,17 @@ function drawPdfPage(
           gridSize,
           traceOpacity.value,
         )
+      } else if (fillRemainingTrace.value) {
+        drawCharacter(
+          context,
+          line.character,
+          line.data,
+          undefined,
+          x,
+          y,
+          gridSize,
+          traceOpacity.value,
+        )
       }
     }
   })
@@ -467,6 +480,14 @@ watch(characters, (items) => items.forEach((character) => void loadStrokeData(ch
             <label for="copybook-title">自定义页头</label>
             <input id="copybook-title" v-model="pageTitle" type="text" maxlength="40" />
           </div>
+
+          <label class="switch-row">
+            <span>
+              <strong>填满剩余格子的描红</strong>
+              <small>完成笔顺递增后，用完整的浅色汉字填满这一行，关闭时保留空白临写格。</small>
+            </span>
+            <input v-model="fillRemainingTrace" type="checkbox" role="switch" />
+          </label>
 
           <div class="action-row">
             <a class="primary-button" href="#copybook-preview"
@@ -661,10 +682,15 @@ watch(characters, (items) => items.forEach((character) => void loadStrokeData(ch
                   <CharacterGrid
                     v-for="index in blankCellCount(character)"
                     :key="`blank-${index}`"
-                    character=""
+                    :character="fillRemainingTrace ? character : ''"
+                    :data="fillRemainingTrace ? (strokeData[character] ?? undefined) : undefined"
+                    :practice-path="
+                      fillRemainingTrace ? strokePracticeMap.get(character)?.path : undefined
+                    "
                     :grid-type="gridType"
                     :grid-color="inkColors[gridColor]"
                     :ink-color="inkColors[inkColor]"
+                    :opacity="fillRemainingTrace ? traceOpacity : 1"
                   />
                 </div>
               </section>
