@@ -7,6 +7,7 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
 defineProps<{
   title: string
   description: string
+  privacyText?: string
 }>()
 </script>
 
@@ -42,7 +43,8 @@ defineProps<{
           <h1 class="tool-page-title">{{ title }}</h1>
           <p class="max-w-2xl text-muted leading-7">{{ description }}</p>
           <p class="privacy-note">
-            <ShieldCheck class="size-4" aria-hidden="true" /> 输入内容和字帖生成均在当前浏览器中完成
+            <ShieldCheck class="size-4" aria-hidden="true" />
+            {{ privacyText ?? '输入内容和字帖生成均在当前浏览器中完成' }}
           </p>
         </div>
       </section>

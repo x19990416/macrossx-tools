@@ -1,8 +1,16 @@
-import { Grid2X2 } from '@lucide/vue'
+import { Calculator, Grid2X2 } from '@lucide/vue'
 
 export const toolCategories = ['全部', '教育'] as const
 
 export const tools = [
+  {
+    name: '小学口算练习册',
+    description: '按范围和运算随机生成循序渐进的 A4 口算练习 PDF。',
+    category: '教育',
+    icon: Calculator,
+    route: '/math-worksheet',
+    keywords: ['数学', '口算', '练习册', '加减乘除', '打印'],
+  },
   {
     name: '汉字字帖生成器',
     description: '输入汉字，生成带完整示字、逐笔描红和整行临写格的 A4 PDF 练字纸。',
