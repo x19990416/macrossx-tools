@@ -11,7 +11,7 @@ import {
 } from './generator'
 
 const selectedRanges = ref<Range[]>([20, 100])
-const selectedOperations = ref<Operation[]>(['add', 'subtract', 'multiply', 'divide'])
+const selectedOperations = ref<Operation[]>(['add', 'subtract', 'multiply', 'divide', 'mixed'])
 const pageCount = ref(1)
 const includeAnswers = ref(false)
 const pages = ref<WorksheetPage[]>([])
@@ -23,6 +23,7 @@ const operationOptions: { value: Operation; label: string }[] = [
   { value: 'subtract', label: '减法 −' },
   { value: 'multiply', label: '乘法 ×' },
   { value: 'divide', label: '除法 ÷' },
+  { value: 'mixed', label: '两步混合运算' },
 ]
 const valid = computed(
   () =>
@@ -54,7 +55,7 @@ function generate() {
 }
 function reset() {
   selectedRanges.value = [20, 100]
-  selectedOperations.value = ['add', 'subtract', 'multiply', 'divide']
+  selectedOperations.value = ['add', 'subtract', 'multiply', 'divide', 'mixed']
   pageCount.value = 1
   includeAnswers.value = false
   pages.value = []
@@ -84,22 +85,22 @@ function drawPage(page: WorksheetPage, index: number, answerPage: boolean): HTML
   ctx.lineTo(1168, 260)
   ctx.stroke()
   page.problems.forEach((problem, i) => {
-    const col = i % 3
-    const row = Math.floor(i / 3)
-    const x = 72 + col * 374
-    const y = 360 + row * 165
+    const col = i % 2
+    const row = Math.floor(i / 2)
+    const x = 72 + col * 548
+    const y = 345 + row * 110
     ctx.fillStyle = '#94a3b8'
     ctx.font = '22px system-ui, sans-serif'
     ctx.fillText(`${index * 24 + i + 1}.`, x, y)
     ctx.fillStyle = '#0f172a'
-    ctx.font = '34px system-ui, sans-serif'
+    ctx.font = `${problem.operation === 'mixed' ? 30 : 34}px system-ui, sans-serif`
     ctx.fillText(problemText(problem), x + 38, y)
     if (answerPage) ctx.fillText(String(problem.answer), x + 38, y + 43)
     else {
       ctx.strokeStyle = '#cbd5e1'
       ctx.beginPath()
-      ctx.moveTo(x + 165, y + 14)
-      ctx.lineTo(x + 298, y + 14)
+      ctx.moveTo(x + 315, y + 14)
+      ctx.lineTo(x + 435, y + 14)
       ctx.stroke()
     }
   })
@@ -186,7 +187,7 @@ async function exportPdf(print = false) {
           ><input v-model="includeAnswers" type="checkbox" /> PDF 末尾附答案页</label
         >
         <p class="text-sm text-muted leading-6">
-          默认综合练习含乘除；一年级专项建议仅选加减。减法不出负数，除法只出表内整除题。
+          默认综合练习含两步混合运算；一年级专项建议仅选加减。减法不出负数，除法只出表内整除题。
         </p>
         <div class="math-actions">
           <button class="math-primary" type="button" :disabled="!valid || busy" @click="generate">
@@ -355,8 +356,8 @@ small {
 .math-problems {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(8, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(12, 1fr);
   height: 78%;
   padding: 2rem 0 0;
   margin: 0;

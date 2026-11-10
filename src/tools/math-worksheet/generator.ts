@@ -1,10 +1,13 @@
-export type Operation = 'add' | 'subtract' | 'multiply' | 'divide'
+export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'mixed'
 export type Range = 20 | 100
 export interface Problem {
   left: number
   right: number
   operation: Operation
   answer: number
+  third?: number
+  firstOperation?: 'add' | 'subtract' | 'multiply' | 'divide'
+  secondOperation?: 'add' | 'subtract'
 }
 export interface WorksheetPage {
   title: string
@@ -16,8 +19,15 @@ export interface WorksheetOptions {
   pageCount: number
 }
 
-const symbols: Record<Operation, string> = { add: '+', subtract: '−', multiply: '×', divide: '÷' }
+const symbols: Record<Exclude<Operation, 'mixed'>, string> = {
+  add: '+',
+  subtract: '−',
+  multiply: '×',
+  divide: '÷',
+}
 export function problemText(problem: Problem) {
+  if (problem.operation === 'mixed')
+    return `${problem.left} ${symbols[problem.firstOperation!]} ${problem.right} ${symbols[problem.secondOperation!]} ${problem.third} =`
   return `${problem.left} ${symbols[problem.operation]} ${problem.right} =`
 }
 function shuffle<T>(items: T[]): T[] {
@@ -31,7 +41,7 @@ function shuffle<T>(items: T[]): T[] {
 interface Stage {
   title: string
   range: Range
-  kind: 'plain' | 'carry' | 'table'
+  kind: 'plain' | 'carry' | 'table' | 'mixed'
   operations: Operation[]
 }
 function stagesFor(options: WorksheetOptions): Stage[] {
@@ -54,12 +64,77 @@ function stagesFor(options: WorksheetOptions): Stage[] {
     if (options.ranges.includes(range) && tables.length)
       stages.push({ title: `${range} 以内 · 表内乘除`, range, kind: 'table', operations: tables })
   }
+  if (options.operations.includes('mixed'))
+    for (const range of [20, 100] as const) {
+      if (options.ranges.includes(range))
+        stages.push({
+          title: `${range} 以内 · 两步混合运算`,
+          range,
+          kind: 'mixed',
+          operations: ['mixed'],
+        })
+    }
   return stages
 }
 function candidates(stage: Stage): Problem[] {
   const result: Problem[] = []
   for (const operation of stage.operations) {
-    if (operation === 'add' || operation === 'subtract') {
+    if (operation === 'mixed') {
+      for (let a = 2; a <= 9; a++)
+        for (let b = 2; b <= 9; b++)
+          for (let c = 1; c <= (stage.range === 20 ? 12 : 30); c++) {
+            const product = a * b
+            for (const secondOperation of ['add', 'subtract'] as const) {
+              const answer = secondOperation === 'add' ? product + c : product - c
+              if (
+                answer < 0 ||
+                answer > stage.range ||
+                product > stage.range ||
+                (stage.range === 100 && answer <= 20)
+              )
+                continue
+              result.push({
+                left: a,
+                right: b,
+                third: c,
+                operation,
+                firstOperation: 'multiply',
+                secondOperation,
+                answer,
+              })
+              const divisionAnswer = secondOperation === 'add' ? b + c : b - c
+              if (
+                divisionAnswer >= 0 &&
+                divisionAnswer <= stage.range &&
+                (stage.range === 20 || divisionAnswer > 20)
+              )
+                result.push({
+                  left: product,
+                  right: a,
+                  third: c,
+                  operation,
+                  firstOperation: 'divide',
+                  secondOperation,
+                  answer: divisionAnswer,
+                })
+            }
+            const addThenSubtract = a + b - c
+            if (
+              addThenSubtract >= 0 &&
+              addThenSubtract <= stage.range &&
+              (stage.range === 20 || addThenSubtract > 20)
+            )
+              result.push({
+                left: a,
+                right: b,
+                third: c,
+                operation,
+                firstOperation: 'add',
+                secondOperation: 'subtract',
+                answer: addThenSubtract,
+              })
+          }
+    } else if (operation === 'add' || operation === 'subtract') {
       const min = stage.range === 20 ? 1 : 21
       for (let left = min; left <= stage.range; left++) {
         for (let right = 1; right <= stage.range; right++) {
@@ -107,9 +182,16 @@ export function generateWorksheets(options: WorksheetOptions): WorksheetPage[] {
   for (let i = 0; i < total; i++) {
     const stageIndex = Math.min(stages.length - 1, Math.floor((i * stages.length) / total))
     const pool = pools[stageIndex]!
-    let problem = pool.find((item) => !seen.has(`${item.operation}:${item.left}:${item.right}`))
+    let problem = pool.find(
+      (item) =>
+        !seen.has(
+          `${item.operation}:${item.firstOperation}:${item.left}:${item.right}:${item.secondOperation}:${item.third}`,
+        ),
+    )
     if (!problem) problem = pool[i % pool.length]!
-    seen.add(`${problem.operation}:${problem.left}:${problem.right}`)
+    seen.add(
+      `${problem.operation}:${problem.firstOperation}:${problem.left}:${problem.right}:${problem.secondOperation}:${problem.third}`,
+    )
     all.push(problem)
   }
   for (let i = 0; i < options.pageCount; i++) {
