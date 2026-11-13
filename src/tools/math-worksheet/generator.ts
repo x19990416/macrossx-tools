@@ -14,9 +14,9 @@ export interface WorksheetPage {
   problems: Problem[]
 }
 export interface WorksheetOptions {
-  ranges: Range[]
-  operations: Operation[]
+  selections: { range: Range; operation: Operation }[]
   pageCount: number
+  order: 'progressive' | 'random'
 }
 
 const symbols: Record<Exclude<Operation, 'mixed'>, string> = {
@@ -46,10 +46,10 @@ interface Stage {
 }
 function stagesFor(options: WorksheetOptions): Stage[] {
   const stages: Stage[] = []
-  const arithmetic = options.operations.filter((op) => op === 'add' || op === 'subtract')
-  const tables = options.operations.filter((op) => op === 'multiply' || op === 'divide')
+  const selected = (range: Range, operation: Operation) =>
+    options.selections.some((item) => item.range === range && item.operation === operation)
   for (const range of [20, 100] as const) {
-    if (!options.ranges.includes(range)) continue
+    const arithmetic = (['add', 'subtract'] as const).filter((op) => selected(range, op))
     if (arithmetic.length) {
       stages.push({
         title: `${range} 以内 · 基础加减`,
@@ -61,19 +61,19 @@ function stagesFor(options: WorksheetOptions): Stage[] {
     }
   }
   for (const range of [20, 100] as const) {
-    if (options.ranges.includes(range) && tables.length)
+    const tables = (['multiply', 'divide'] as const).filter((op) => selected(range, op))
+    if (tables.length)
       stages.push({ title: `${range} 以内 · 表内乘除`, range, kind: 'table', operations: tables })
   }
-  if (options.operations.includes('mixed'))
-    for (const range of [20, 100] as const) {
-      if (options.ranges.includes(range))
-        stages.push({
-          title: `${range} 以内 · 两步混合运算`,
-          range,
-          kind: 'mixed',
-          operations: ['mixed'],
-        })
-    }
+  for (const range of [20, 100] as const) {
+    if (selected(range, 'mixed'))
+      stages.push({
+        title: `${range} 以内 · 两步混合运算`,
+        range,
+        kind: 'mixed',
+        operations: ['mixed'],
+      })
+  }
   return stages
 }
 function candidates(stage: Stage): Problem[] {
@@ -164,8 +164,8 @@ function candidates(stage: Stage): Problem[] {
 }
 export function generateWorksheets(options: WorksheetOptions): WorksheetPage[] {
   if (
-    !options.ranges.length ||
-    !options.operations.length ||
+    !options.selections.length ||
+    !['progressive', 'random'].includes(options.order) ||
     !Number.isInteger(options.pageCount) ||
     options.pageCount < 1 ||
     options.pageCount > 20
@@ -194,12 +194,18 @@ export function generateWorksheets(options: WorksheetOptions): WorksheetPage[] {
     )
     all.push(problem)
   }
+  const ordered = options.order === 'random' ? shuffle(all) : all
   for (let i = 0; i < options.pageCount; i++) {
     const midpoint = (i * 24 + 12) / total
     const stage = stages[Math.min(stages.length - 1, Math.floor(midpoint * stages.length))]!
     pages.push({
-      title: stages.length > 1 && total / stages.length < 24 ? '综合递进练习' : stage.title,
-      problems: all.slice(i * 24, (i + 1) * 24),
+      title:
+        options.order === 'random'
+          ? '随机混排练习'
+          : stages.length > 1 && total / stages.length < 24
+            ? '综合递进练习'
+            : stage.title,
+      problems: ordered.slice(i * 24, (i + 1) * 24),
     })
   }
   return pages

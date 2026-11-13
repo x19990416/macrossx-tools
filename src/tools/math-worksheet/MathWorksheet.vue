@@ -10,8 +10,13 @@ import {
   type WorksheetPage,
 } from './generator'
 
-const selectedRanges = ref<Range[]>([20, 100])
-const selectedOperations = ref<Operation[]>(['add', 'subtract', 'multiply', 'divide', 'mixed'])
+const allSelections = ([20, 100] as const).flatMap((range) =>
+  (['add', 'subtract', 'multiply', 'divide', 'mixed'] as const).map(
+    (operation) => `${range}:${operation}`,
+  ),
+)
+const selectedKeys = ref<string[]>([...allSelections])
+const order = ref<'progressive' | 'random'>('progressive')
 const pageCount = ref(1)
 const includeAnswers = ref(false)
 const pages = ref<WorksheetPage[]>([])
@@ -27,14 +32,13 @@ const operationOptions: { value: Operation; label: string }[] = [
 ]
 const valid = computed(
   () =>
-    selectedRanges.value.length > 0 &&
-    selectedOperations.value.length > 0 &&
+    selectedKeys.value.length > 0 &&
     Number.isInteger(pageCount.value) &&
     pageCount.value >= 1 &&
     pageCount.value <= 20,
 )
 watch(
-  [selectedRanges, selectedOperations, pageCount],
+  [selectedKeys, order, pageCount],
   () => {
     pages.value = []
     status.value = '条件已更改，请重新生成练习册。'
@@ -44,8 +48,11 @@ watch(
 function generate() {
   try {
     pages.value = generateWorksheets({
-      ranges: selectedRanges.value,
-      operations: selectedOperations.value,
+      selections: selectedKeys.value.map((key) => {
+        const [range, operation] = key.split(':')
+        return { range: Number(range) as Range, operation: operation as Operation }
+      }),
+      order: order.value,
       pageCount: pageCount.value,
     })
     status.value = `已生成 ${pages.value.length} 页、${pages.value.length * 24} 道题。`
@@ -54,8 +61,8 @@ function generate() {
   }
 }
 function reset() {
-  selectedRanges.value = [20, 100]
-  selectedOperations.value = ['add', 'subtract', 'multiply', 'divide', 'mixed']
+  selectedKeys.value = [...allSelections]
+  order.value = 'progressive'
   pageCount.value = 1
   includeAnswers.value = false
   pages.value = []
@@ -148,27 +155,39 @@ async function exportPdf(print = false) {
 <template>
   <ToolLayout
     title="小学口算练习册"
-    description="按学习阶段生成 A4 口算练习纸。选范围、选运算，一页 24 题，随机题目循序渐进。"
+    description="按学习阶段生成 A4 口算练习纸。按范围与运算自由组合，每页 24 题，可选循序渐进或随机混排。"
     privacy-text="题目生成与 PDF 导出均在当前浏览器中完成"
   >
     <div class="page-shell math-workspace pb-20">
       <section class="settings-panel" aria-labelledby="math-settings-title">
         <div class="panel-heading"><h2 id="math-settings-title">练习设置</h2></div>
         <fieldset class="math-field">
-          <legend>数值范围（可多选）</legend>
-          <div class="math-choice-row">
-            <label v-for="range in rangeOptions" :key="range" class="math-choice"
-              ><input v-model="selectedRanges" type="checkbox" :value="range" />
-              {{ range }} 以内</label
-            >
+          <legend>选择练习组合（可多选）</legend>
+          <div class="math-combination-grid">
+            <div v-for="range in rangeOptions" :key="range" class="math-combination-group">
+              <strong>{{ range }} 以内</strong>
+              <div class="math-choice-row">
+                <label v-for="option in operationOptions" :key="option.value" class="math-choice">
+                  <input
+                    v-model="selectedKeys"
+                    type="checkbox"
+                    :value="`${range}:${option.value}`"
+                  />
+                  {{ option.label }}
+                </label>
+              </div>
+            </div>
           </div>
+          <small>例如只勾选「20 以内加、减」与「100 以内乘、除」。</small>
         </fieldset>
         <fieldset class="math-field">
-          <legend>运算类型（可多选）</legend>
+          <legend>题目排列</legend>
           <div class="math-choice-row">
-            <label v-for="option in operationOptions" :key="option.value" class="math-choice"
-              ><input v-model="selectedOperations" type="checkbox" :value="option.value" />
-              {{ option.label }}</label
+            <label class="math-choice"
+              ><input v-model="order" type="radio" value="progressive" /> 循序渐进</label
+            >
+            <label class="math-choice"
+              ><input v-model="order" type="radio" value="random" /> 随机混排</label
             >
           </div>
         </fieldset>
@@ -259,6 +278,17 @@ async function exportPdf(print = false) {
   font-size: 0.875rem;
   font-weight: 700;
   margin-bottom: 0.65rem;
+}
+.math-combination-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+.math-combination-group {
+  display: grid;
+  gap: 0.5rem;
+}
+.math-combination-group strong {
+  font-size: 0.875rem;
 }
 .math-choice-row {
   display: flex;
