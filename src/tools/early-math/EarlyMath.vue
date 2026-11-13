@@ -1,11 +1,39 @@
 <script setup lang="ts">
-import { Blocks, Cookie, Gem } from '@lucide/vue'
+import {
+  Blocks,
+  Box,
+  Brain,
+  Cookie,
+  Gem,
+  KeyRound,
+  Puzzle,
+  RotateCw,
+  Route,
+  Ruler,
+  Scale,
+  Search,
+  Shapes,
+} from '@lucide/vue'
 import { computed, nextTick, ref } from 'vue'
 
 import ToolLayout from '@/components/ToolLayout.vue'
 
-import { activities, beadSets, guests, pattern, type ActivityId } from './activities'
+import {
+  abilityDomains,
+  activities,
+  beadSets,
+  guests,
+  pattern,
+  type ActivityId,
+} from './activities'
 import { challengeTasks, familyTasks } from './task-cards'
+import { questions, type NewGameId } from './spatial-questions'
+import ChoiceWorkshop from './components/ChoiceWorkshop.vue'
+import MemoryWorkshop from './components/MemoryWorkshop.vue'
+import NumberTrail from './components/NumberTrail.vue'
+import PatternChallenge from './components/PatternChallenge.vue'
+import PuzzleWorkshop from './components/PuzzleWorkshop.vue'
+import SortingGame from './components/SortingGame.vue'
 import TaskCards from './TaskCards.vue'
 
 const sections = [
@@ -15,9 +43,24 @@ const sections = [
 ] as const
 const section = ref<(typeof sections)[number]['id']>('games')
 
-const icons = { sharing: Cookie, packing: Blocks, pattern: Gem }
+const icons = {
+  sharing: Cookie,
+  packing: Blocks,
+  pattern: Gem,
+  sorting: Shapes,
+  trail: Route,
+  puzzle: Puzzle,
+  rotate: RotateCw,
+  cubes: Box,
+  measure: Ruler,
+  weight: Scale,
+  code: KeyRound,
+  clues: Search,
+  memory: Brain,
+}
 const selected = ref<ActivityId>('sharing')
 const round = ref<0 | 1>(0)
+const advancedPattern = ref(false)
 const plates = ref([0, 0, 0])
 const blocks = ref<boolean[]>([])
 const beads = ref<(0 | 1)[]>([])
@@ -26,6 +69,11 @@ const solved = ref(false)
 const feedback = ref('')
 const hint = ref(false)
 const heading = ref<HTMLElement | null>(null)
+
+const workshop = computed(() => {
+  const id = selected.value
+  return Object.hasOwn(questions, id) ? (id as NewGameId) : undefined
+})
 
 const activity = computed(() => activities.find(({ id }) => id === selected.value)!)
 const total = computed(() => (round.value === 0 ? 6 : 8))
@@ -70,6 +118,7 @@ function reset() {
 async function choose(id: ActivityId, nextRound: 0 | 1 = 0) {
   selected.value = id
   round.value = nextRound
+  advancedPattern.value = false
   reset()
   await nextTick()
   heading.value?.focus()
@@ -133,7 +182,7 @@ reset()
 <template>
   <ToolLayout
     title="幼升小数学游戏"
-    description="先从分点心、收积木和串手链开始，也可以把生活任务带回家。想再难一点，还有进阶挑战。"
+    description="分点心、接规律、给图形分类，或带小兔跳格子。先动手，再说理由，还能把玩法带回生活。"
     privacy-text="全部游戏在当前浏览器中运行，无需登录，不上传作答"
   >
     <div class="page-shell no-print space-y-5 pb-12">
@@ -195,172 +244,207 @@ reset()
           class="rounded-2xl border bg-card p-4 shadow-sm sm:p-7"
         >
           <p class="mb-2 text-sm font-semibold text-primary">
-            {{ round === 0 ? '先玩一玩' : '换个条件再试' }}
+            {{
+              selected === 'sorting' || selected === 'trail' || advancedPattern || round === 0
+                ? '动手试一试'
+                : '换个条件再试'
+            }}
           </p>
           <h2 id="game-title" ref="heading" tabindex="-1" class="text-2xl font-bold">
             {{ activity.name }}
           </h2>
-          <p class="mt-2 leading-7 text-muted">{{ prompt }}</p>
+          <SortingGame v-if="selected === 'sorting'" />
+          <NumberTrail v-else-if="selected === 'trail'" />
+          <PuzzleWorkshop v-else-if="selected === 'puzzle'" />
+          <ChoiceWorkshop v-else-if="workshop" :key="workshop" :game="workshop" />
+          <MemoryWorkshop v-else-if="selected === 'memory'" />
+          <template v-else>
+            <button
+              v-if="selected === 'pattern'"
+              type="button"
+              class="secondary-button mt-3 min-h-11"
+              :aria-pressed="advancedPattern"
+              @click="advancedPattern = !advancedPattern"
+            >
+              {{ advancedPattern ? '回到基础串手链' : '试试双规律挑战' }}
+            </button>
+            <PatternChallenge v-if="advancedPattern" />
+            <template v-else>
+              <p class="mt-2 leading-7 text-muted">{{ prompt }}</p>
 
-          <div v-if="selected === 'sharing'" class="mt-5">
-            <div class="rounded-xl bg-primary-soft p-3">
-              <p role="status">
-                桌上还有 <strong>{{ remaining }}</strong> 块饼干
-              </p>
-              <span aria-hidden="true" class="block break-all text-xl tracking-wider">{{
-                '🍪'.repeat(remaining)
-              }}</span>
-            </div>
-            <div class="mt-3 grid gap-2 sm:grid-cols-3">
-              <div v-for="(guest, i) in guests" :key="guest" class="rounded-xl border p-3">
-                <p class="font-semibold">{{ guest }}的盘子 · {{ plates[i] }} 块</p>
-                <p aria-hidden="true" class="min-h-7 break-all">
-                  {{ '🍪'.repeat(plates[i] ?? 0) }}
-                </p>
-                <div class="mt-2 flex flex-wrap gap-2">
+              <div v-if="selected === 'sharing'" class="mt-5">
+                <div class="rounded-xl bg-primary-soft p-3">
+                  <p role="status">
+                    桌上还有 <strong>{{ remaining }}</strong> 块饼干
+                  </p>
+                  <span aria-hidden="true" class="block break-all text-xl tracking-wider">{{
+                    '🍪'.repeat(remaining)
+                  }}</span>
+                </div>
+                <div class="mt-3 grid gap-2 sm:grid-cols-3">
+                  <div v-for="(guest, i) in guests" :key="guest" class="rounded-xl border p-3">
+                    <p class="font-semibold">{{ guest }}的盘子 · {{ plates[i] }} 块</p>
+                    <p aria-hidden="true" class="min-h-7 break-all">
+                      {{ '🍪'.repeat(plates[i] ?? 0) }}
+                    </p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        class="secondary-button min-h-11"
+                        :aria-label="`给${guest}放一块`"
+                        :disabled="remaining === 0"
+                        @click="changePlate(i, 1)"
+                      >
+                        放一块
+                      </button>
+                      <button
+                        type="button"
+                        class="secondary-button min-h-11"
+                        :aria-label="`从${guest}盘里拿回一块`"
+                        :disabled="plates[i] === 0"
+                        @click="changePlate(i, -1)"
+                      >
+                        拿回
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-else-if="selected === 'packing'"
+                class="mt-5 grid grid-cols-3 gap-2 sm:max-w-md sm:gap-3"
+              >
+                <button
+                  v-for="(filled, i) in blocks"
+                  :key="i"
+                  type="button"
+                  class="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed aria-pressed:border-solid aria-pressed:bg-primary-soft"
+                  :aria-label="`位置 ${i + 1}`"
+                  :aria-pressed="filled"
+                  :disabled="i < initialBlocks"
+                  @click="toggleBlock(i)"
+                >
+                  <Blocks v-if="filled" class="size-5 text-primary" aria-hidden="true" />
+                  <span class="text-sm">{{ filled ? '有积木' : '空格' }}</span>
+                </button>
+              </div>
+
+              <div v-else class="mt-5 space-y-3">
+                <div role="group" class="flex flex-wrap gap-2" aria-label="手链上的珠子">
+                  <div
+                    v-for="group in 3"
+                    :key="group"
+                    class="flex gap-1 rounded-lg border p-1.5"
+                    :class="{ 'border-dashed': group === 3 }"
+                  >
+                    <span
+                      v-for="(bead, i) in pattern"
+                      :key="i"
+                      class="grid size-8 place-items-center rounded bg-primary-soft text-xl font-bold text-primary"
+                    >
+                      <template v-if="group < 3"
+                        >{{ pieces[bead].mark
+                        }}<span class="sr-only">{{ pieces[bead].name }}</span></template
+                      >
+                      <template v-else>{{
+                        beads[i] === undefined ? '·' : pieces[beads[i]].mark
+                      }}</template>
+                    </span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
                   <button
+                    v-for="choice in [0, 1] as const"
+                    :key="choice"
                     type="button"
                     class="secondary-button min-h-11"
-                    :aria-label="`给${guest}放一块`"
-                    :disabled="remaining === 0"
-                    @click="changePlate(i, 1)"
+                    :disabled="beads.length === pattern.length"
+                    @click="addBead(choice)"
                   >
-                    放一块
+                    <span aria-hidden="true">{{ pieces[choice].mark }}</span>
+                    {{ pieces[choice].name }}
                   </button>
                   <button
                     type="button"
                     class="secondary-button min-h-11"
-                    :aria-label="`从${guest}盘里拿回一块`"
-                    :disabled="plates[i] === 0"
-                    @click="changePlate(i, -1)"
+                    :disabled="beads.length === 0"
+                    @click="undoBead"
                   >
-                    拿回
+                    撤回一颗
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div
-            v-else-if="selected === 'packing'"
-            class="mt-5 grid grid-cols-3 gap-2 sm:max-w-md sm:gap-3"
-          >
-            <button
-              v-for="(filled, i) in blocks"
-              :key="i"
-              type="button"
-              class="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed aria-pressed:border-solid aria-pressed:bg-primary-soft"
-              :aria-label="`位置 ${i + 1}`"
-              :aria-pressed="filled"
-              :disabled="i < initialBlocks"
-              @click="toggleBlock(i)"
-            >
-              <Blocks v-if="filled" class="size-5 text-primary" aria-hidden="true" />
-              <span class="text-sm">{{ filled ? '有积木' : '空格' }}</span>
-            </button>
-          </div>
-
-          <div v-else class="mt-5 space-y-3">
-            <div role="group" class="flex flex-wrap gap-2" aria-label="手链上的珠子">
-              <div
-                v-for="group in 3"
-                :key="group"
-                class="flex gap-1 rounded-lg border p-1.5"
-                :class="{ 'border-dashed': group === 3 }"
-              >
-                <span
-                  v-for="(bead, i) in pattern"
-                  :key="i"
-                  class="grid size-8 place-items-center rounded bg-primary-soft text-xl font-bold text-primary"
+              <div class="mt-5 flex flex-wrap gap-2">
+                <button type="button" class="primary-button min-h-11" @click="check">
+                  检查一下
+                </button>
+                <button
+                  type="button"
+                  class="secondary-button min-h-11"
+                  aria-controls="game-hint"
+                  :aria-expanded="hint"
+                  @click="hint = !hint"
                 >
-                  <template v-if="group < 3"
-                    >{{ pieces[bead].mark
-                    }}<span class="sr-only">{{ pieces[bead].name }}</span></template
-                  >
-                  <template v-else>{{
-                    beads[i] === undefined ? '·' : pieces[beads[i]].mark
-                  }}</template>
-                </span>
+                  {{ hint ? '收起提示' : '给个提示' }}
+                </button>
+                <button type="button" class="secondary-button min-h-11" @click="reset">
+                  重新摆
+                </button>
               </div>
-            </div>
-            <div class="flex flex-wrap gap-2">
+              <p v-show="hint" id="game-hint" class="mt-3 text-sm leading-6 text-muted">
+                {{ hintText }}
+              </p>
+              <div role="status">
+                <p v-if="checked" class="mt-4 rounded-xl bg-primary-soft p-3 leading-7">
+                  {{ feedback }}
+                </p>
+              </div>
               <button
-                v-for="choice in [0, 1] as const"
-                :key="choice"
+                v-if="solved && round === 0"
                 type="button"
-                class="secondary-button min-h-11"
-                :disabled="beads.length === pattern.length"
-                @click="addBead(choice)"
+                class="secondary-button mt-3 min-h-11"
+                @click="choose(selected, 1)"
               >
-                <span aria-hidden="true">{{ pieces[choice].mark }}</span> {{ pieces[choice].name }}
+                换个条件再试
               </button>
               <button
+                v-if="round === 1"
                 type="button"
-                class="secondary-button min-h-11"
-                :disabled="beads.length === 0"
-                @click="undoBead"
+                class="secondary-button mt-3 min-h-11"
+                @click="choose(selected)"
               >
-                撤回一颗
+                回到第一轮
               </button>
-            </div>
-          </div>
-
-          <div class="mt-5 flex flex-wrap gap-2">
-            <button type="button" class="primary-button min-h-11" @click="check">检查一下</button>
-            <button
-              type="button"
-              class="secondary-button min-h-11"
-              aria-controls="game-hint"
-              :aria-expanded="hint"
-              @click="hint = !hint"
-            >
-              {{ hint ? '收起提示' : '给个提示' }}
-            </button>
-            <button type="button" class="secondary-button min-h-11" @click="reset">重新摆</button>
-          </div>
-          <p v-show="hint" id="game-hint" class="mt-3 text-sm leading-6 text-muted">
-            {{ hintText }}
-          </p>
-          <div role="status">
-            <p v-if="checked" class="mt-4 rounded-xl bg-primary-soft p-3 leading-7">
-              {{ feedback }}
-            </p>
-          </div>
-          <button
-            v-if="solved && round === 0"
-            type="button"
-            class="secondary-button mt-3 min-h-11"
-            @click="choose(selected, 1)"
-          >
-            换个条件再试
-          </button>
-          <button
-            v-if="round === 1"
-            type="button"
-            class="secondary-button mt-3 min-h-11"
-            @click="choose(selected)"
-          >
-            回到第一轮
-          </button>
+            </template>
+          </template>
         </section>
 
         <details class="rounded-xl border bg-card p-4">
           <summary
             class="cursor-pointer font-semibold focus-visible:outline-2 focus-visible:outline-primary"
           >
-            家长陪玩：把方法带回生活
+            家长观察：培养目标与生活练习
           </summary>
-          <p class="mt-3 leading-7 text-muted">
-            先让孩子自己摆，再问「你怎么知道的？」不用要求写算式。{{ activity.offline }}
-          </p>
-          <p class="mt-2 text-sm text-muted">
-            活动灵感：<a
-              class="text-primary underline underline-offset-2"
-              :href="activity.source.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              >{{ activity.source.label }}</a
-            >。本站为独立中文改编，并非原站翻译。
+          <dl class="mt-3 space-y-3 text-sm leading-6">
+            <div>
+              <dt class="font-semibold">
+                培养目标 · {{ abilityDomains[activity.ability.domain] }}
+              </dt>
+              <dd class="mt-1 text-muted">{{ activity.ability.goal }}</dd>
+            </div>
+            <div>
+              <dt class="font-semibold">家长可以观察</dt>
+              <dd class="mt-1 text-muted">{{ activity.ability.observation }}</dd>
+            </div>
+            <div>
+              <dt class="font-semibold">带回生活</dt>
+              <dd class="mt-1 text-muted">{{ activity.offline }}</dd>
+            </div>
+          </dl>
+          <p class="mt-3 text-sm leading-6 text-muted">
+            可以记下孩子是「提示后做到」「独立做到」还是「换个情境也能做到」。一次答对不等于已经掌握。
           </p>
         </details>
       </div>
