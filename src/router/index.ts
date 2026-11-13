@@ -13,6 +13,7 @@ const router = createRouter({
       component: HomeView,
     },
     { path: '/math-worksheet', name: 'math-worksheet', component: MathWorksheet },
+    { path: '/early-math', name: 'early-math', component: () => import('@/tools/early-math') },
     {
       path: '/chinese-copybook',
       name: 'chinese-copybook',
